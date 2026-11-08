@@ -1,0 +1,1807 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Дверь в другую вселенную</title>
+    
+    <!-- Предзагрузка ключевых графических ресурсов книги -->
+    <link rel="preload" href="image/cover.webp" as="image" type="image/webp">
+    <link rel="preload" href="image/endpaper.webp" as="image" type="image/webp">
+    <link rel="preload" href="image/title-page.webp" as="image" type="image/webp">
+    <link rel="preload" href="image/epigraph-page.webp" as="image" type="image/webp">
+    <link rel="preload" href="image/dedication-page.webp" as="image" type="image/webp">
+    <link rel="preload" href="image/back-endpaper.webp" as="image" type="image/webp">
+    <link rel="preload" href="image/back-endpaper2.webp" as="image" type="image/webp">
+    <link rel="preload" href="image/black-cover.webp" as="image" type="image/webp">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        :root {
+            --bg-color: #050a15;
+            --book-w: 600px;
+            --book-h: 870px;
+            --shift-open-x: 0px;
+            --paper-color: #fdfaf0;
+            --ambient-light: rgba(255, 230, 150, 0);
+            --cover-img: url('image/cover.webp');
+            --endpaper-img: url('image/endpaper.webp');
+            --back-endpaper-img: url('image/back-endpaper.webp');
+            --back-endpaper2-img: url('image/back-endpaper2.webp');
+            --black-cover-img: url('image/black-cover.webp');
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg-color);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Georgia', serif;
+            overflow: hidden;
+            perspective: 2000px;
+            transition: background 3s ease;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .ambient-glow {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150vw; height: 150vh;
+            background: radial-gradient(circle at center, var(--ambient-light) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+            transition: background 3s ease;
+        }
+
+        .layout-shifter {
+            position: relative;
+            width: 100vw; height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 1.5s cubic-bezier(0.645, 0.045, 0.355, 1);
+            z-index: 10;
+        }
+
+        .book-container {
+            position: relative;
+            width: var(--book-w);
+            height: var(--book-h);
+            transform-style: preserve-3d;
+            transform: translateX(var(--shift-open-x));
+            transition: transform 1.5s cubic-bezier(0.645, 0.045, 0.355, 1), width 0.5s ease, height 0.5s ease;
+        }
+
+        .book-cover {
+            position: absolute;
+            width: 100%; height: 100%;
+            transform-style: preserve-3d;
+            transform-origin: left center;
+            transition: transform 1.5s cubic-bezier(0.645, 0.045, 0.355, 1), opacity 0.5s ease;
+            z-index: 1000;
+        }
+
+        .book-container.is-opened .book-cover {
+            pointer-events: none !important;
+        }
+
+        .b-face {
+            position: absolute;
+            width: 100%; height: 100%;
+            backface-visibility: hidden;
+            border-radius: 4px 12px 12px 4px;
+        }
+
+        .b-front {
+            background-color: #1a2a40;
+            background-image: var(--cover-img);
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            transform: translateZ(15px);
+            box-shadow: inset 5px 0 20px rgba(0,0,0,0.5), 10px 10px 30px rgba(0,0,0,0.8);
+            transition: filter 0.6s ease-out, box-shadow 0.6s ease-out;
+            cursor: pointer;
+        }
+        
+        .b-front.magical-touch {
+            filter: brightness(1.2) contrast(1.15); 
+        }
+
+        #moonlightGlow.pulse-glow {
+            box-shadow: 0 0 70px 30px rgba(176, 210, 255, 0.6) !important;
+            transition: box-shadow 0.3s ease-out;
+        }
+
+        .beam-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            border-radius: 4px 12px 12px 4px;
+            transform: translateZ(16px);
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 200;
+        }
+
+        .beam-overlay::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: linear-gradient(110deg,
+                rgba(255,255,255,0) 40%,
+                rgba(176, 210, 255, 0.65) 50%,
+                rgba(255,255,255,0) 60%
+            );
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+
+        .beam-overlay::before {
+            content: '';
+            position: absolute;
+            right: 15%; bottom: 20%;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: transparent;
+            box-shadow: -2px 2px 0 0 rgba(176, 210, 255, 0.85); 
+            opacity: 0;
+        }
+
+        .beam-overlay.play-beam::after { animation: sweepBeam 2.5s ease-in-out forwards; }
+        .beam-overlay.play-beam::before { animation: gatherCrescent 1.4s ease-in-out 2.1s forwards; }
+
+        @keyframes sweepBeam {
+            0% { transform: translateX(-100%); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateX(100%); opacity: 0; }
+        }
+
+        @keyframes gatherCrescent {
+            0% { opacity: 0; transform: scale(0.2) rotate(-60deg); filter: drop-shadow(0 0 2px rgba(176, 210, 255, 0.2)); }
+            20% { opacity: 1; transform: scale(1) rotate(-15deg); filter: drop-shadow(0 0 4px rgba(176, 210, 255, 0.6)); }
+            75% { opacity: 1; transform: scale(1) rotate(-15deg); filter: drop-shadow(0 0 3px rgba(176, 210, 255, 0.4)); }
+            100% { opacity: 0; transform: scale(1.05) rotate(0deg); filter: drop-shadow(0 0 8px rgba(176, 210, 255, 0)); }
+        }
+
+        .b-back {
+            transform: rotateY(180deg) translateZ(15px);
+            background-color: #1a2a40;
+            box-shadow: inset -5px 0 20px rgba(0,0,0,0.5);
+            border-radius: 12px 4px 4px 12px;
+        }
+
+        .b-inner {
+            transform: rotateY(180deg) translateZ(-14px);
+            background-color: var(--paper-color);
+            background-image: var(--endpaper-img); 
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 12px 4px 4px 12px;
+            box-shadow: inset 0 0 40px rgba(139, 115, 85, 0.15);
+            backface-visibility: hidden;
+            pointer-events: none !important;
+        }
+
+        .spine-block {
+            position: absolute;
+            width: 30px; height: 100%;
+            left: -15px;
+            transform: rotateY(-90deg) translateZ(0);
+            background-color: #0f1926;
+            transform-style: preserve-3d;
+            overflow: hidden;
+            pointer-events: none !important;
+        }
+
+        .spine-block::after {
+            content: ''; position: absolute;
+            top: -100%; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(176, 210, 255, 0.8) 50%, rgba(255,255,255,0) 100%);
+            opacity: 0; pointer-events: none;
+        }
+
+        .b-front.awakening-brightness {
+            filter: brightness(1.25) contrast(1.1) drop-shadow(0 0 5px rgba(255,215,0,0.3)) !important;
+            transition: filter 0.3s ease-out !important;
+        }
+        .beam-overlay.awakening-crescent::before {
+            opacity: 1 !important; transform: scale(1.1) rotate(0deg) !important;
+            filter: drop-shadow(0 0 8px rgba(176, 210, 255, 0.9)) !important;
+            transition: all 0.3s ease-out !important;
+        }
+        .spine-block.awakening-spine-glow::after { animation: spineSpark 0.3s ease-in-out forwards; }
+
+        @keyframes spineSpark { 0% { top: -100%; opacity: 0; } 50% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+        .b-inner::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to left, rgba(176, 210, 255, 0.45) 0%, rgba(176, 210, 255, 0.1) 40%, transparent 70%);
+            opacity: 0; pointer-events: none; border-radius: 12px 4px 4px 12px;
+        }
+
+        .pages-block::after {
+            content: ''; position: absolute; top: -2%; left: -20px;
+            width: 40px; height: 104%; background: transparent; border-radius: 50%;
+            opacity: 0; z-index: 500; pointer-events: none;
+        }
+
+        .book-container.is-opened .b-inner::after { animation: innerCoverMoonlight 1.7s ease-out forwards; }
+        .book-container.is-opened .pages-block::after { animation: spineSpillLight 1.7s ease-out forwards; }
+
+        @keyframes innerCoverMoonlight { 0%, 15% { opacity: 0; } 35% { opacity: 1; } 75% { opacity: 0.3; } 100% { opacity: 0; } }
+        @keyframes spineSpillLight { 
+            0% { box-shadow: 0 0 0px 0px rgba(176, 210, 255, 0); opacity: 0; }
+            15% { box-shadow: -5px 0 10px 5px rgba(176, 210, 255, 0.2); opacity: 1; }
+            35% { box-shadow: -20px 0 60px 30px rgba(176, 210, 255, 0.5); opacity: 1; } 
+            75% { box-shadow: -10px 0 20px 10px rgba(176, 210, 255, 0.1); opacity: 1; }
+            100% { box-shadow: 0 0 0px 0px rgba(176, 210, 255, 0); opacity: 0; } 
+        }
+
+        #easterEggMsg {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #111; font-size: 1.6rem; font-family: 'Georgia', serif; text-align: center;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.9), 0 0 5px rgba(255, 255, 255, 1);
+            opacity: 0; pointer-events: none; z-index: 100; width: 80%;
+        }
+        #easterEggMsg.show { animation: easterEggFade 4s ease-in-out forwards; }
+        @keyframes easterEggFade { 0%, 100% { opacity: 0; } 25%, 75% { opacity: 1; } }
+
+        body.is-mobile-reader .spine-block { display: none; }
+
+        /* Физическая основа задней крышки обложки */
+        .book-back-cover {
+            position: absolute; width: 100%; height: 100%;
+            transform: translateZ(-15px);
+            background-color: #1a2a40; 
+            background-image: var(--back-endpaper-img);
+            background-size: 100% 100%; 
+            background-position: center;
+            background-repeat: no-repeat;
+            border-radius: 4px 12px 12px 4px;
+            box-shadow: 20px 20px 40px rgba(0,0,0,0.8), inset -5px 0 20px rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            backface-visibility: hidden; transform-origin: left center;
+            transition: transform 1.5s cubic-bezier(0.645, 0.045, 0.355, 1), opacity 0.5s ease;
+            transform-style: preserve-3d;
+            pointer-events: none;
+        }
+
+        .book-back-cover::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #1a2a40; background-image: var(--black-cover-img);
+            background-size: 100% 100%; background-position: center; background-repeat: no-repeat;
+            transform: rotateY(180deg) translateZ(1px); backface-visibility: hidden;
+            border-radius: 12px 4px 4px 12px; box-shadow: inset -5px 0 20px rgba(0,0,0,0.5);
+        }
+
+        .book-back-cover.is-closing-back { transform: rotateY(-180deg) translateZ(-15px); transition: transform 0.43s cubic-bezier(0.4, 0, 0.2, 1); }
+        body.is-mobile-reader .book-back-cover { transform-origin: center center; }
+        body.is-mobile-reader .book-back-cover.is-closing-back { transform: rotateY(-180deg) translateZ(16px); transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        /* Итоговая внешняя задняя обложка закрытой книги: строго одиночная по центру */
+        #backCoverFinal {
+            position: absolute; 
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 100%;
+            background-color: #1a2a40; 
+            background-image: var(--black-cover-img);
+            background-size: 100% 100%; 
+            background-position: center;
+            background-repeat: no-repeat;
+            border-radius: 12px 4px 4px 12px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8), inset -5px 0 20px rgba(0,0,0,0.5);
+            opacity: 0; 
+            pointer-events: none; 
+            transition: opacity 0.5s ease;
+            z-index: 6000; 
+            transform: translateZ(25px); 
+        }
+        #backCoverFinal.show { 
+            opacity: 1 !important; 
+            pointer-events: auto !important; 
+            cursor: pointer; 
+        }
+
+        .pages-block { position: absolute; width: 98%; height: 96%; top: 2%; left: 1%; transform-style: preserve-3d; z-index: 50; transition: opacity 0.4s ease; }
+        body.is-mobile-reader .pages-block { width: 100%; height: 100%; top: 0; left: 0; }
+
+        .leaf {
+            position: absolute; width: 100%; height: 100%;
+            transform-style: preserve-3d; transform-origin: left center;
+            transition: transform 1.5s cubic-bezier(0.645, 0.045, 0.355, 1);
+            pointer-events: none;
+        }
+        body.is-mobile-reader .leaf { transform-origin: center center; transition: opacity 0.6s ease, transform 0.6s ease; }
+        .leaf.is-turned { transform: rotateY(-180deg); }
+
+        .mobile-page {
+            position: absolute; width: 100%; height: 100%;
+            background-color: var(--paper-color); background-size: 100% 100%; background-position: center; background-repeat: no-repeat;
+            border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0; pointer-events: none; transform: translateX(20px) scale(0.98); z-index: 1;
+        }
+        .mobile-page.is-active { opacity: 1; pointer-events: auto; transform: translateX(0) scale(1); z-index: 5; }
+        .mobile-page.is-turned { opacity: 0; pointer-events: none; transform: translateX(-40px) scale(0.95); z-index: 1; }
+
+        .leaf-face {
+            position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
+            background-color: var(--paper-color); background-size: 100% 100%; background-position: center; background-repeat: no-repeat;
+            overflow: hidden; border-radius: 8px;
+        }
+        .leaf-front {
+            transform: rotateY(0deg); border-radius: 2px 10px 10px 2px;
+            box-shadow: inset 20px 0 35px -10px rgba(0,0,0,0.12), inset 2px 0 6px -1px rgba(0,0,0,0.25), -1px 1px 2px rgba(0,0,0,0.08);
+        }
+        .leaf-back {
+            transform: rotateY(180deg); border-radius: 10px 2px 2px 10px; background-color: var(--paper-color);
+            box-shadow: inset -20px 0 35px -10px rgba(0,0,0,0.12), inset -2px 0 6px -1px rgba(0,0,0,0.25), 1px 1px 2px rgba(0,0,0,0.08);
+        }
+
+        .leaf-front::after, .leaf-back::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; transition: opacity 1.5s cubic-bezier(0.645, 0.045, 0.355, 1); border-radius: inherit;
+        }
+        .leaf-front::after { background: linear-gradient(to right, rgba(0,0,0,0.25) 0%, rgba(255,255,255,0.4) 10%, rgba(255,255,255,0.0) 25%, rgba(0,0,0,0.05) 60%, rgba(0,0,0,0.3) 100%); opacity: 0; }
+        .leaf.is-turned .leaf-front::after { opacity: 1; }
+        .leaf-back::after { background: linear-gradient(to left, rgba(0,0,0,0.25) 0%, rgba(255,255,255,0.4) 10%, rgba(255,255,255,0.0) 25%, rgba(0,0,0,0.05) 60%, rgba(0,0,0,0.3) 100%); opacity: 1; }
+        .leaf.is-turned .leaf-back::after { opacity: 0; }
+        
+        .reveal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 20; border-radius: inherit; overflow: hidden;
+            background-color: var(--paper-color); opacity: 0; 
+        }
+        .reveal-overlay.is-active { animation: hazeAndClear 2.5s ease-out forwards; }
+        .reveal-overlay::after {
+            content: ''; position: absolute; top: -100%; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, 
+                rgba(255,255,255,0) 0%, 
+                rgba(255,255,255,0.1) 40%, 
+                rgba(176, 210, 255, 0.25) 50%, 
+                rgba(255,255,255,0.1) 60%, 
+                rgba(255,255,255,0) 100%
+            );
+            opacity: 0;
+        }
+        .reveal-overlay.is-active::after { animation: sweepRevealBeam 1.5s ease-in-out 1s forwards; }
+        
+        @keyframes hazeAndClear { 0% { opacity: 0; } 10%, 45% { opacity: 0.12; } 80%, 100% { opacity: 0; } }
+        @keyframes sweepRevealBeam { 0% { top: -100%; opacity: 0; } 10%, 90% { opacity: 0.7; } 100% { top: 100%; opacity: 0; } }
+
+        .passing-cloud::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 15, 30, 0.07); pointer-events: none; border-radius: inherit;
+            z-index: 100; opacity: 0; animation: passingCloudShadow 7s ease-in-out forwards;
+        }
+        @keyframes passingCloudShadow { 0%, 100% { opacity: 0; } 45% { opacity: 1; } }
+
+        .fallback-text {
+            display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;
+            color: rgba(139, 115, 85, 0.65); font-size: 1.3rem; border: 2px dashed rgba(139, 115, 85, 0.3);
+            text-align: center; padding: 20px; box-sizing: border-box; background: rgba(0, 0, 0, 0.03);
+            font-family: 'Georgia', serif;
+        }
+
+        .reading-btn {
+            position: absolute; top: 20px; right: 20px; background: rgba(10, 15, 30, 0.6);
+            border: 1px solid rgba(255, 230, 150, 0.3); color: #ffe696; padding: 12px;
+            border-radius: 50%; cursor: pointer; z-index: 9500; font-size: 1.5rem;
+            backdrop-filter: blur(5px); opacity: 0; pointer-events: none; transition: all 0.3s ease;
+        }
+        .reading-btn.show { opacity: 1; pointer-events: auto; }
+        .reading-btn:hover { background: rgba(255, 230, 150, 0.15); transform: scale(1.05); }
+        #audioBtn { right: 80px; }
+
+        /* ТАКТИЛЬНЫЕ ЗОНЫ КЛИКА */
+        .book-tactile-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 8500;
+            display: none;
+            pointer-events: none;
+        }
+        
+        .book-container.is-opened .book-tactile-wrapper {
+            display: block;
+            left: -100%;
+            width: 200%;
+        }
+
+        body.is-mobile-reader .book-container.is-opened .book-tactile-wrapper {
+            display: block;
+            left: 0;
+            width: 100%;
+        }
+
+        .touch-left, .touch-right {
+            position: absolute;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            cursor: pointer;
+            pointer-events: auto !important;
+            z-index: 8600;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .touch-left { 
+            left: 0; 
+            cursor: w-resize;
+        }
+        .touch-right { 
+            right: 0; 
+            cursor: e-resize;
+        }
+
+        /* Навигационные экранные стрелки */
+        .page-nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 52px;
+            height: 52px;
+            background: rgba(10, 15, 30, 0.75);
+            border: 1px solid rgba(255, 230, 150, 0.5);
+            border-radius: 50%;
+            color: #ffe696;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            cursor: pointer;
+            z-index: 9200;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(6px);
+            box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+        }
+        .page-nav-arrow.show { opacity: 0.8; pointer-events: auto; }
+        .page-nav-arrow:hover { opacity: 1; transform: translateY(-50%) scale(1.12); background: rgba(20, 30, 50, 0.9); color: #fff; }
+        .arrow-prev { left: -75px; }
+        .arrow-next { right: -75px; }
+
+        body.is-mobile-reader .arrow-prev { left: 10px; width: 44px; height: 44px; font-size: 1.3rem; }
+        body.is-mobile-reader .arrow-next { right: 10px; width: 44px; height: 44px; font-size: 1.3rem; }
+
+        #prologueContainer, #epilogueContainer {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000; z-index: 10000; display: flex; justify-content: center; align-items: center;
+        }
+        #epilogueContainer { display: none; opacity: 0; transition: opacity 1s ease; }
+        
+        #introVideo, #outroVideo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity 1.5s ease; }
+        #introVideo.fade-out, #outroVideo.fade-out { opacity: 0; }
+        
+        #skipIntroBtn, #skipOutroBtn {
+            position: absolute; bottom: 30px; right: 30px; background: rgba(0, 0, 0, 0.5);
+            color: rgba(255, 230, 150, 0.9); border: 1px solid rgba(255, 230, 150, 0.4);
+            padding: 10px 24px; border-radius: 20px; font-family: 'Georgia', serif; font-size: 14px;
+            cursor: pointer; z-index: 10001; transition: all 0.3s ease; backdrop-filter: blur(6px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        #skipIntroBtn:hover, #skipOutroBtn:hover { background: rgba(255, 230, 150, 0.2); color: #ffffff; }
+        @media (max-width: 768px) { #skipIntroBtn, #skipOutroBtn { bottom: 80px; right: 20px; font-size: 12px; padding: 8px 16px; } }
+        
+        .video-manual-play-btn {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(10, 15, 30, 0.85); color: rgba(255, 230, 150, 0.95);
+            border: 1px solid rgba(255, 230, 150, 0.5); padding: 18px 36px; font-size: 1.3rem;
+            font-family: 'Georgia', serif; border-radius: 30px; cursor: pointer; z-index: 10002;
+            box-shadow: 0 0 35px rgba(176, 210, 255, 0.4); backdrop-filter: blur(8px);
+            transition: all 0.3s ease;
+        }
+        .video-manual-play-btn:hover { background: rgba(255, 230, 150, 0.25); transform: translate(-50%, -50%) scale(1.05); }
+
+        #blackOverlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9999; opacity: 1; transition: opacity 1s ease; pointer-events: none; }
+        #blackOverlay.hidden { opacity: 0; }
+
+        #touchPrompt {
+            position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%) translateY(15px);
+            opacity: 0; pointer-events: none; text-align: center; font-family: 'Georgia', serif; font-size: 1.2rem; line-height: 1.6;
+            color: rgba(253, 250, 245, 0.85); text-shadow: 0 0 15px rgba(176, 210, 255, 0.5);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out; z-index: 8000; letter-spacing: 0.5px; width: 100%;
+        }
+        #touchPrompt.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        @media (max-width: 768px) { #touchPrompt { bottom: 12%; font-size: 1rem; } }
+
+        #moonlightGlow { position: absolute; width: var(--book-w); height: var(--book-h); background: transparent; border-radius: 12px; z-index: 5; pointer-events: none; transition: box-shadow 1.5s ease-in-out; }
+        #moonlightGlow.cinematic-glow { box-shadow: 0 0 70px 25px rgba(176, 210, 255, 0.35); }
+
+        #startScreen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.35); z-index: 20000; display: flex; justify-content: center; align-items: center;
+            transition: opacity 0.8s ease, backdrop-filter 0.8s ease; backdrop-filter: blur(5px);
+        }
+        #startBtn {
+            background: rgba(10, 15, 30, 0.85); color: rgba(255, 230, 150, 0.95);
+            border: 1px solid rgba(255, 230, 150, 0.5); padding: 16px 45px; font-size: 1.25rem;
+            font-family: 'Georgia', serif; border-radius: 30px; cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 0 25px rgba(176, 210, 255, 0.25); backdrop-filter: blur(6px);
+        }
+        #startBtn:hover { background: rgba(255, 230, 150, 0.2); box-shadow: 0 0 45px rgba(176, 210, 255, 0.6); transform: scale(1.05); }
+
+        @media (orientation: landscape) and (max-height: 600px) {
+            .reading-btn {
+                font-size: 1.1rem;
+                padding: 8px;
+                top: 10px;
+            }
+            #readingBtn { right: 15px; }
+            #audioBtn { right: 60px; }
+            #skipIntroBtn, #skipOutroBtn { bottom: 15px; right: 15px; font-size: 11px; padding: 6px 12px; }
+            #touchPrompt { bottom: 4%; font-size: 0.9rem; }
+            #startBtn { padding: 10px 30px; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <button id="startBtn">Открыть книгу</button>
+    </div>
+
+    <div id="blackOverlay"></div>
+    <div id="touchPrompt">Прикоснитесь к книге…<br>Дверь во вселенную ждёт вас. ✨</div>
+    
+    <div id="prologueContainer" style="display: none;">
+        <video id="introVideo" playsinline preload="metadata" poster="video/intro-poster.webp"></video>
+        <button id="skipIntroBtn">Пропустить вступление</button>
+    </div>
+
+    <div id="epilogueContainer" style="display: none;">
+        <video id="outroVideo" playsinline preload="none"></video>
+        <button id="skipOutroBtn">Пропустить видео</button>
+    </div>
+
+    <div class="ambient-glow" id="ambientGlow"></div>
+    <button class="reading-btn" id="readingBtn" onclick="window.engine.toggleReadingMode()">📖</button>
+    <button class="reading-btn" id="audioBtn" onclick="window.engine.toggleAudioMode()">🔇</button>
+
+    <div class="layout-shifter" id="layoutShifter">
+        <div id="moonlightGlow"></div>
+        
+        <div class="book-container" id="bookContainer">
+            
+            <div class="book-cover" id="bookCover" onmouseenter="window.triggerMagicalPulse()" ontouchstart="window.triggerMagicalPulse()" onclick="window.engine.openBook()">
+                <div class="b-face b-front"></div>
+                <div class="beam-overlay" id="coverBeam"></div>
+                <div class="b-face b-back"></div>
+                <div class="b-face b-inner">
+                    <div id="easterEggMsg">Спасибо за путешествие в другую вселенную.</div>
+                </div>
+                <div class="spine-block"></div>
+            </div>
+
+            <div class="book-back-cover" id="oldBackCover" onclick="window.engine.flipToFront()"></div>
+            <div id="backCoverFinal" onclick="window.engine.flipToFront()"></div>
+
+            <div class="pages-block" id="realPagesContainer"></div>
+            
+            <!-- Навигационные стрелки для десктопа и мобильных -->
+            <button class="page-nav-arrow arrow-prev" id="navArrowPrev" onclick="window.engine.handleNavClick(event, 'prev')" title="Предыдущая страница">‹</button>
+            <button class="page-nav-arrow arrow-next" id="navArrowNext" onclick="window.engine.handleNavClick(event, 'next')" title="Следующая страница">›</button>
+
+            <!-- Тактильные области клика/тапа по обеим сторонам разворота -->
+            <div class="book-tactile-wrapper" id="tactileWrapper">
+                <div class="touch-left" id="touchAreaLeft" onclick="window.engine.handleNavClick(event, 'prev')" title="Листать назад"></div>
+                <div class="touch-right" id="touchAreaRight" onclick="window.engine.handleNavClick(event, 'next')" title="Листать вперёд"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ENABLE_INTRO = true;       
+        const INTRO_VIDEO = "video/intro.mp4"; 
+        const ENABLE_OUTRO = true;       
+        const OUTRO_VIDEO = "video/outro.mp4"; 
+
+        function formatPageBaseName(pageNumber) {
+            return 'page-' + String(pageNumber).padStart(2, '0');
+        }
+
+        /*
+         * СТРОГИЙ ПОРЯДОК СТРАНИЦ КНИГИ «ДВЕРЬ В ДРУГУЮ ВСЕЛЕННУЮ»:
+         * 1. title-page (титульный лист)
+         * 2. epigraph-page (эпиграф)
+         * 3. page-01 ... page-60 (основная история, 60 страниц)
+         * 4. dedication-page (эпилог: 4 детей, текст про дверь с двух сторон)
+         * 5. back-endpaper (первый задний форзац)
+         * 6. back-endpaper2 (второй задний форзац)
+         * 
+         * Всего ровно 65 страниц в блоке:
+         * В десктопе 33 двусторонних листа:
+         * Лист 0: title-page (лицо) / epigraph-page (оборот)
+         * Лист 1..30: page-01 .. page-60
+         * Лист 31: dedication-page (лицо) / back-endpaper (оборот)
+         * Лист 32: back-endpaper2 (лицо) / blank-endpaper (оборот, примыкает к задней крышке)
+         * Закрытие книги: black-cover.webp
+         * Финал: outro.mp4
+         */
+        const MAIN_STORY_PAGES = Array.from({ length: 60 }, (_, i) => formatPageBaseName(i + 1));
+
+        const BOOK_PAGES = [
+            "title-page",
+            "epigraph-page",
+            ...MAIN_STORY_PAGES,
+            "dedication-page",
+            "back-endpaper",
+            "back-endpaper2"
+        ];
+
+        window.bookState = "STATE_COVER"; 
+        let hasInteracted = false;
+        window.cachedImageExtension = '.webp';
+        
+        window.triggerMagicalPulse = () => {
+            if (hasInteracted || window.bookState !== "STATE_COVER" || (window.engine && window.engine.isAnimating)) return;
+            hasInteracted = true;
+
+            const layoutShifter = document.getElementById('layoutShifter');
+            const bFront = document.querySelector('.b-front');
+            const moonlightGlow = document.getElementById('moonlightGlow'); 
+
+            if (bFront) bFront.classList.add('magical-touch');
+            if (moonlightGlow) moonlightGlow.classList.add('pulse-glow');
+            
+            if (layoutShifter) {
+                layoutShifter.style.transition = 'transform 0.6s ease-out';
+                layoutShifter.style.transform = 'scale(1.015)';
+            }
+
+            setTimeout(() => {
+                if (bFront) bFront.classList.remove('magical-touch');
+                if (moonlightGlow) moonlightGlow.classList.remove('pulse-glow');
+                
+                if (layoutShifter) {
+                    if (window.engine && !window.engine.isReadingMode) {
+                        layoutShifter.style.transition = 'transform 0.8s ease-in-out';
+                        layoutShifter.style.transform = 'scale(1)';
+                    }
+                    setTimeout(() => {
+                        layoutShifter.style.transition = 'transform 1.5s cubic-bezier(0.645, 0.045, 0.355, 1)';
+                    }, 800);
+                }
+            }, 600);
+        };
+
+        class BookEngine {
+            constructor(pagesArray) {
+                this.pages = pagesArray;
+                this.currentPageIndex = 0; 
+                this.currentLeafIndex = 0; 
+                this.isAnimating = false;
+                this.isReadingMode = false;
+                this.isMobileReader = window.innerWidth < 768;
+                this.cloudTimer = null;
+                this.pageElements = [];
+                
+                this.isAudioMode = false;
+                this.currentVoiceover = null;
+                this.voiceoverResolve = null;
+                this.resolvedImageMap = {};
+                this.resolvedVideoMap = {};
+                this.outroHasPlayed = false;
+
+                this.touchStartX = 0;
+                this.touchStartY = 0;
+            }
+
+            initAudio() {
+                try {
+                    this.paperSynth = new Tone.NoiseSynth({
+                        noise: { type: "brown" },
+                        envelope: { attack: 0.05, decay: 0.4, sustain: 0, release: 0.1 }
+                    });
+                    this.paperFilter = new Tone.Filter(1200, "lowpass").toDestination();
+                    this.paperSynth.connect(this.paperFilter);
+                    this.paperSynth.volume.value = -3;
+
+                    this.magicSynth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.3, decay: 2, sustain: 0.2, release: 3 }
+                    }).toDestination();
+                    this.magicSynth.volume.value = -12;
+
+                    this.bgDrone = new Tone.FMSynth({
+                        harmonicity: 0.5,
+                        modulationIndex: 1.2,
+                        oscillator: { type: "sine" },
+                        modulation: { type: "triangle" },
+                        envelope: { attack: 3, decay: 1, sustain: 1, release: 4 }
+                    }).toDestination();
+                    this.bgDrone.volume.value = -28;
+                } catch(e) {
+                    console.warn("Tone.js audio synth init note:", e);
+                }
+            }
+
+            playPageTurnSound() {
+                if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') Tone.context.resume();
+                if (this.paperSynth) this.paperSynth.triggerAttackRelease(0.3);
+                
+                if (this.magicSynth && Math.random() > 0.4) {
+                    const notes = ["C5", "E5", "G5", "A5"];
+                    this.magicSynth.triggerAttackRelease(notes[Math.floor(Math.random()*notes.length)], "8n", "+0.1");
+                }
+            }
+
+            updateLayout() {
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                const pageRatio = 1 / 1.45; 
+                let singlePageW, singlePageH;
+                
+                this.isMobileReader = w < 768 && w < h;
+                const isMobileLandscape = w > h && h <= 600;
+
+                if (this.isMobileReader) {
+                    document.body.classList.add('is-mobile-reader');
+                    let maxPageW = w * 0.90; 
+                    let maxPageH = h * 0.85;
+                    singlePageH = maxPageH;
+                    singlePageW = singlePageH * pageRatio;
+                    if (singlePageW > maxPageW) {
+                        singlePageW = maxPageW;
+                        singlePageH = singlePageW / pageRatio;
+                    }
+                } else {
+                    document.body.classList.remove('is-mobile-reader');
+                    
+                    if (isMobileLandscape) {
+                        let maxPageW = w * 0.48; 
+                        let maxPageH = h * 0.95;
+                        
+                        singlePageH = maxPageH;
+                        singlePageW = singlePageH * pageRatio;
+                        if (singlePageW > maxPageW) {
+                            singlePageW = maxPageW;
+                            singlePageH = singlePageW / pageRatio;
+                        }
+                    } else {
+                        let maxPageW = w * 0.46; 
+                        if (maxPageW > 600) maxPageW = 600; 
+                        let maxPageH = h * 0.85;
+                        
+                        singlePageH = maxPageH;
+                        singlePageW = singlePageH * pageRatio;
+                        if (singlePageW > maxPageW) {
+                            singlePageW = maxPageW;
+                            singlePageH = singlePageW / pageRatio;
+                        }
+                    }
+                }
+
+                document.documentElement.style.setProperty('--book-w', `${singlePageW}px`);
+                document.documentElement.style.setProperty('--book-h', `${singlePageH}px`);
+                
+                if (window.bookState === "STATE_OPEN" || window.bookState === "opening") {
+                    if (!this.isReadingMode) {
+                        document.documentElement.style.setProperty('--shift-open-x', this.isMobileReader ? '0px' : '50%');
+                    }
+                } else if (window.bookState === "STATE_COVER") {
+                    document.documentElement.style.setProperty('--shift-open-x', '0px');
+                } else if (window.bookState === "STATE_CLOSED_BACK" || window.bookState === "closing") {
+                    // При закрытии книги на заднюю обложку центрируем её ровно по центру экрана
+                    document.documentElement.style.setProperty('--shift-open-x', '0px');
+                }
+
+                this.updateNavArrows();
+            }
+
+            updateNavArrows() {
+                const prevBtn = document.getElementById('navArrowPrev');
+                const nextBtn = document.getElementById('navArrowNext');
+                if (!prevBtn || !nextBtn) return;
+
+                if (window.bookState !== "STATE_OPEN") {
+                    prevBtn.classList.remove('show');
+                    nextBtn.classList.remove('show');
+                    return;
+                }
+
+                const currentIndex = this.isMobileReader ? this.currentPageIndex : this.currentLeafIndex;
+
+                if (currentIndex > 0) {
+                    prevBtn.classList.add('show');
+                } else {
+                    prevBtn.classList.remove('show');
+                }
+
+                // Стрелка "Вперёд" активна всегда, пока книга открыта (на последнем развороте она закрывает книгу на black-cover)
+                nextBtn.classList.add('show');
+            }
+
+            async resolveImageSource(baseName) {
+                if (this.resolvedImageMap[baseName]) {
+                    return this.resolvedImageMap[baseName];
+                }
+
+                let candidates = [];
+                if (baseName === 'dedication-page') {
+                    candidates = ['dedication-page.webp', 'dedication-page.png', 'dedication.webp'];
+                } else if (baseName === 'title-page') {
+                    candidates = ['title-page.webp', 'title-page.png'];
+                } else if (baseName === 'epigraph-page') {
+                    candidates = ['epigraph-page.webp', 'epigraph-page.png'];
+                } else if (baseName === 'back-endpaper2') {
+                    candidates = ['back-endpaper2.webp', 'back-endpaper2.png', 'back-endpaper-2.webp', 'back-endpaper-2.png'];
+                } else if (baseName === 'back-endpaper') {
+                    candidates = ['back-endpaper.webp', 'back-endpaper.png'];
+                } else if (baseName === 'black-cover') {
+                    candidates = ['black-cover.webp', 'black-cover.png', 'black-cover.jpg'];
+                } else if (baseName === 'blank-endpaper') {
+                    // Оборот последнего листа оформляется как чистый кремовый форзацный лист без запроса к несуществующей картинке
+                    return null;
+                } else {
+                    const ext = window.cachedImageExtension || '.webp';
+                    candidates = [baseName + ext, baseName + '.png', baseName + '.jpg'];
+                }
+
+                for (let fileName of candidates) {
+                    const url = 'image/' + fileName;
+                    const exists = await new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => resolve(true);
+                        img.onerror = () => resolve(false);
+                        img.src = url;
+                    });
+                    if (exists) {
+                        this.resolvedImageMap[baseName] = url;
+                        return url;
+                    }
+                }
+
+                const fallbackUrl = 'image/' + baseName + (window.cachedImageExtension || '.webp');
+                this.resolvedImageMap[baseName] = fallbackUrl;
+                return fallbackUrl;
+            }
+
+            async resolveVideoSource(type) {
+                if (this.resolvedVideoMap[type]) {
+                    return this.resolvedVideoMap[type];
+                }
+
+                const candidatePaths = type === 'intro' 
+                    ? [INTRO_VIDEO, 'intro.mp4', 'video/intro.webm', 'intro.webm']
+                    : [OUTRO_VIDEO, 'outro.mp4', 'video/outro.webm', 'outro.webm'];
+
+                for (let testUrl of candidatePaths) {
+                    const canPlay = await new Promise((resolve) => {
+                        const v = document.createElement('video');
+                        v.preload = 'metadata';
+                        v.onloadedmetadata = () => resolve(true);
+                        v.oncanplay = () => resolve(true);
+                        v.onerror = () => resolve(false);
+                        // Достаточный таймаут для проверки локального видео
+                        setTimeout(() => resolve(false), 1500);
+                        v.src = testUrl;
+                    });
+                    if (canPlay) {
+                        this.resolvedVideoMap[type] = testUrl;
+                        return testUrl;
+                    }
+                }
+                // Если метаданные не успели вернуть статус, но путь дефолтный — возвращаем дефолтный
+                return (type === 'intro') ? INTRO_VIDEO : OUTRO_VIDEO;
+            }
+
+            async loadAndSetImage(baseName, element) {
+                if (!baseName || !element) return;
+
+                if (baseName === 'blank-endpaper') {
+                    element.style.backgroundImage = 'none';
+                    element.style.backgroundColor = 'var(--paper-color)';
+                    element.dataset.loaded = 'true';
+                    return;
+                }
+
+                const url = await this.resolveImageSource(baseName);
+                if (url) {
+                    element.style.backgroundImage = `url('${url}')`;
+                    element.dataset.loaded = 'true';
+                }
+                
+                const fallback = element.querySelector('.fallback-text');
+                if (fallback) fallback.remove();
+            }
+
+            initPhysicalPages() {
+                const container = document.getElementById('realPagesContainer');
+                if (!container) return;
+                
+                container.innerHTML = ''; 
+                this.pageElements = []; 
+
+                if (this.isMobileReader) {
+                    this.pages.forEach((pageBaseName, index) => {
+                        const pageEl = document.createElement('div');
+                        pageEl.className = 'mobile-page';
+                        
+                        if (index < this.currentPageIndex) pageEl.classList.add('is-turned');
+                        else if (index === this.currentPageIndex) pageEl.classList.add('is-active');
+                        
+                        pageEl.dataset.basename = pageBaseName;
+                        container.appendChild(pageEl);
+                        this.pageElements.push(pageEl);
+                    });
+                } else {
+                    const leavesCount = Math.ceil(this.pages.length / 2);
+                    for (let i = 0; i < leavesCount; i++) {
+                        const frontPageBaseName = this.pages[i * 2];     
+                        let backPageBaseName = this.pages[i * 2 + 1];  
+                        
+                        // Если у последнего листа нет пары — назначаем чистый форзацный лист blank-endpaper (не дублируем back-endpaper!)
+                        if (i === leavesCount - 1 && !backPageBaseName) {
+                            backPageBaseName = 'blank-endpaper';
+                        }
+
+                        const leaf = document.createElement('div');
+                        leaf.className = 'leaf';
+                        if (i < this.currentLeafIndex) leaf.classList.add('is-turned');
+                        
+                        const frontDiv = document.createElement('div');
+                        frontDiv.className = 'leaf-face leaf-front';
+                        frontDiv.dataset.basename = frontPageBaseName; 
+                        
+                        const backDiv = document.createElement('div');
+                        backDiv.className = 'leaf-face leaf-back';
+                        backDiv.dataset.basename = backPageBaseName;   
+
+                        leaf.appendChild(frontDiv);
+                        leaf.appendChild(backDiv);
+                        container.appendChild(leaf);
+                        this.pageElements.push(leaf);
+                    }
+                }
+                
+                if (this.currentLeafIndex > 0 || this.currentPageIndex > 0) this.isolateCover();
+                this.updateZIndices();
+                this.loadVisiblePages(); 
+                this.updateNavArrows();
+            }
+
+            loadVisiblePages() {
+                const buffer = 2; 
+                
+                const renderPage = (element) => {
+                    if (!element || !element.dataset.basename) return;
+                    if (!element.querySelector('.reveal-overlay')) {
+                        const reveal = document.createElement('div');
+                        reveal.className = 'reveal-overlay';
+                        element.appendChild(reveal);
+                    }
+                    if (element.dataset.loaded !== 'true') {
+                        this.loadAndSetImage(element.dataset.basename, element);
+                    }
+                };
+
+                const clearPage = (element) => {
+                    if (!element) return;
+                    if (element.dataset.loaded === 'true') {
+                        element.style.backgroundImage = 'none';
+                        element.dataset.loaded = 'false';
+                        const overlay = element.querySelector('.reveal-overlay');
+                        if (overlay) overlay.remove();
+                    }
+                };
+
+                if (this.isMobileReader) {
+                    this.pageElements.forEach((pageEl, index) => {
+                        const isNear = index >= this.currentPageIndex - 1 && index <= this.currentPageIndex + buffer;
+                        if (isNear) renderPage(pageEl);
+                        else clearPage(pageEl);
+                    });
+                } else {
+                    this.pageElements.forEach((leaf, index) => {
+                        const isNear = index >= this.currentLeafIndex - 1 && index <= this.currentLeafIndex + buffer;
+                        const frontDiv = leaf.querySelector('.leaf-front');
+                        const backDiv = leaf.querySelector('.leaf-back');
+                        if (isNear) {
+                            renderPage(frontDiv);
+                            renderPage(backDiv);
+                        } else {
+                            clearPage(frontDiv);
+                            clearPage(backDiv);
+                        }
+                    });
+                }
+            }
+
+            triggerCloudShadow() {
+                if (this.cloudTimer) clearTimeout(this.cloudTimer);
+                document.querySelectorAll('.passing-cloud').forEach(el => el.classList.remove('passing-cloud'));
+                
+                this.cloudTimer = setTimeout(() => {
+                    if (window.bookState !== "STATE_OPEN" || this.isAnimating) return;
+                    if (this.isMobileReader) {
+                        const activePage = document.querySelector('.mobile-page.is-active');
+                        if (activePage) activePage.classList.add('passing-cloud');
+                    } else {
+                        const leaves = document.querySelectorAll('.leaf');
+                        const currentIndex = this.currentLeafIndex;
+                        if (currentIndex > 0) {
+                            const prevLeaf = leaves[currentIndex - 1];
+                            const backFace = prevLeaf.querySelector('.leaf-back');
+                            if (backFace) backFace.classList.add('passing-cloud');
+                        }
+                        if (currentIndex < leaves.length) {
+                            const currentLeaf = leaves[currentIndex];
+                            const frontFace = currentLeaf.querySelector('.leaf-front');
+                            if (frontFace) frontFace.classList.add('passing-cloud');
+                        }
+                    }
+                }, 1500);
+            }
+
+            triggerPageReveal() {
+                if (this.isMobileReader) {
+                    const activePage = document.querySelector('.mobile-page.is-active');
+                    if (activePage) {
+                        const overlay = activePage.querySelector('.reveal-overlay');
+                        if (overlay && !overlay.dataset.revealed) {
+                            overlay.dataset.revealed = 'true';
+                            void overlay.offsetWidth; 
+                            overlay.classList.add('is-active');
+                        }
+                    }
+                } else {
+                    const leaves = document.querySelectorAll('.leaf');
+                    const currentIndex = this.currentLeafIndex;
+                    if (currentIndex > 0) {
+                        const prevLeaf = leaves[currentIndex - 1];
+                        const backFace = prevLeaf.querySelector('.leaf-back');
+                        if (backFace) {
+                            const overlay = backFace.querySelector('.reveal-overlay');
+                            if (overlay && !overlay.dataset.revealed) {
+                                overlay.dataset.revealed = 'true';
+                                void overlay.offsetWidth;
+                                overlay.classList.add('is-active');
+                            }
+                        }
+                    }
+                    if (currentIndex < leaves.length) {
+                        const currentLeaf = leaves[currentIndex];
+                        const frontFace = currentLeaf.querySelector('.leaf-front');
+                        if (frontFace) {
+                            const overlay = frontFace.querySelector('.reveal-overlay');
+                            if (overlay && !overlay.dataset.revealed) {
+                                overlay.dataset.revealed = 'true';
+                                void overlay.offsetWidth;
+                                overlay.classList.add('is-active');
+                            }
+                        }
+                    }
+                }
+            }
+
+            isolateCover() {
+                const cover = document.getElementById('bookCover');
+                if (cover) {
+                    const bBack = cover.querySelector('.b-back');
+                    if (bBack) bBack.style.display = 'none';
+                    cover.style.transform = 'rotateY(-180deg) translateZ(30px)';
+                    cover.style.pointerEvents = 'none';
+                }
+            }
+
+            openBook() {
+                if (window.bookState !== "STATE_COVER" || this.isAnimating) return;
+                
+                const prompt = document.getElementById('touchPrompt');
+                if (prompt) {
+                    prompt.classList.remove('show');
+                    if (window.promptTimeout) clearTimeout(window.promptTimeout);
+                }
+
+                this.isAnimating = true;
+
+                const bFront = document.querySelector('.b-front');
+                const beam = document.getElementById('coverBeam');
+                const spine = document.querySelector('.spine-block');
+
+                if (bFront) bFront.classList.add('awakening-brightness');
+                if (beam) beam.classList.add('awakening-crescent');
+                if (spine) spine.classList.add('awakening-spine-glow');
+
+                setTimeout(() => {
+                    window.bookState = "opening";
+
+                    const bBack = document.querySelector('.b-back');
+                    if (bBack) bBack.style.display = 'none';
+
+                    document.getElementById('bookContainer').classList.add('is-opened');
+                    this.updateLayout();
+
+                    if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') Tone.context.resume();
+                    if (this.magicSynth) this.magicSynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "2n");
+                    if (this.bgDrone) this.bgDrone.triggerAttack("C3");
+                    
+                    setTimeout(() => {
+                        window.bookState = "STATE_OPEN";
+                        this.isolateCover(); 
+                        
+                        const tactile = document.getElementById('tactileWrapper');
+                        if (tactile) tactile.style.display = "block";
+                        
+                        const btn = document.getElementById('readingBtn');
+                        if (btn) btn.classList.add('show');
+                        
+                        const audioBtn = document.getElementById('audioBtn');
+                        if (audioBtn) audioBtn.classList.add('show');
+                        
+                        this.updateZIndices(); 
+                        this.updateNavArrows();
+                        this.isAnimating = false;
+
+                        if (bFront) bFront.classList.remove('awakening-brightness');
+                        if (beam) beam.classList.remove('awakening-crescent');
+                        if (spine) spine.classList.remove('awakening-spine-glow');
+                        
+                        this.triggerCloudShadow();
+                        this.triggerPageReveal();
+
+                        const isFinished = localStorage.getItem('door_universe_book_finished') === 'true';
+                        const isShown = localStorage.getItem('door_universe_easter_egg_shown') === 'true';
+                        
+                        if (isFinished && !isShown) {
+                            if (this.isMobileReader) {
+                                const mobileMsg = document.createElement('div');
+                                mobileMsg.id = 'mobileEasterEgg';
+                                mobileMsg.innerHTML = 'Спасибо за путешествие в другую вселенную.';
+                                mobileMsg.style.cssText = `
+                                    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                                    background: rgba(253, 250, 245, 0.95); border: 1px solid rgba(139, 115, 85, 0.3);
+                                    color: #111; padding: 20px 30px; border-radius: 12px;
+                                    font-family: 'Georgia', serif; font-size: 1.2rem; text-align: center;
+                                    text-shadow: 0 1px 4px rgba(255, 255, 255, 0.8);
+                                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); backdrop-filter: blur(5px);
+                                    opacity: 0; transition: opacity 1s ease; z-index: 10000; width: 85%;
+                                `;
+                                document.body.appendChild(mobileMsg);
+                                setTimeout(() => mobileMsg.style.opacity = '1', 100);
+                                setTimeout(() => { mobileMsg.style.opacity = '0'; setTimeout(() => mobileMsg.remove(), 1000); }, 3500);
+                            } else {
+                                const msg = document.getElementById('easterEggMsg');
+                                if (msg) msg.classList.add('show');
+                            }
+                            localStorage.setItem('door_universe_easter_egg_shown', 'true');
+                        }
+
+                        this.playVoiceover();
+
+                    }, 1800);
+                }, 300);
+            }
+
+            updateZIndices(activeTurnIndex = -1, isGoingBack = false) {
+                const leaves = document.querySelectorAll('.leaf');
+                const cover = document.getElementById('bookCover');
+                
+                if (cover) cover.style.zIndex = (window.bookState === "STATE_OPEN") ? 0 : 1000;
+                
+                if (this.isMobileReader) {
+                    const mobilePages = document.querySelectorAll('.mobile-page');
+                    mobilePages.forEach((page, i) => {
+                        if (i === this.currentPageIndex) page.style.zIndex = 50;
+                        else if (i < this.currentPageIndex) page.style.zIndex = 10;
+                        else page.style.zIndex = 20 - (i - this.currentPageIndex);
+                    });
+                    return;
+                }
+
+                const currentIndex = this.currentLeafIndex;
+                const total = leaves.length;
+
+                leaves.forEach((leaf, i) => {
+                    if (i === activeTurnIndex) {
+                        leaf.style.zIndex = total + 200; 
+                    } else if (i < currentIndex) {
+                        leaf.style.zIndex = i + 10;
+                    } else {
+                        leaf.style.zIndex = (total - i) + 10;
+                    }
+                });
+            }
+
+            handleNavClick(event, direction) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                this.turnPage(direction);
+            }
+
+            turnPage(direction) {
+                if (this.isAnimating || window.bookState !== "STATE_OPEN") return;
+                
+                if (this.cloudTimer) clearTimeout(this.cloudTimer);
+                document.querySelectorAll('.passing-cloud').forEach(el => el.classList.remove('passing-cloud'));
+                
+                this.stopVoiceover();
+                
+                const leaves = document.querySelectorAll('.leaf');
+                const mobilePages = document.querySelectorAll('.mobile-page');
+                
+                if (this.isMobileReader) {
+                    if (direction === 'next') {
+                        // Если достигли конца всех страниц (back-endpaper2) — СРАЗУ закрываем книгу на black-cover
+                        if (this.currentPageIndex >= mobilePages.length - 1) { 
+                            this.closeBook(); 
+                            return; 
+                        }
+                        this.isAnimating = true; 
+                        this.playPageTurnSound();
+                        
+                        const currentPage = mobilePages[this.currentPageIndex];
+                        if (currentPage) { 
+                            currentPage.classList.remove('is-active'); 
+                            currentPage.classList.add('is-turned'); 
+                        }
+                        
+                        this.currentPageIndex++;
+                        const nextPage = mobilePages[this.currentPageIndex];
+                        if (nextPage) nextPage.classList.add('is-active');
+                        
+                        this.updateZIndices();
+                        setTimeout(() => this.finalizeTurn(), 400);
+
+                    } else if (direction === 'prev') {
+                        if (this.currentPageIndex <= 0) return; 
+                        
+                        this.isAnimating = true; 
+                        this.playPageTurnSound();
+                        
+                        const currentPage = mobilePages[this.currentPageIndex];
+                        if (currentPage) currentPage.classList.remove('is-active');
+                        
+                        this.currentPageIndex--;
+                        const prevPage = mobilePages[this.currentPageIndex];
+                        if (prevPage) { 
+                            prevPage.classList.remove('is-turned'); 
+                            prevPage.classList.add('is-active'); 
+                        }
+
+                        this.updateZIndices();
+                        setTimeout(() => this.finalizeTurn(), 400);
+                    }
+                } else {
+                    // --- ДЕСКТОПНЫЙ РЕЖИМ ---
+                    if (direction === 'next') {
+                        // Лист 32 содержит на лицевой стороне back-endpaper2.
+                        // Когда currentLeafIndex равен leaves.length - 1 (31), перед нами разворот:
+                        // Слева: back-endpaper, Справа: back-endpaper2.
+                        // Следующий клик "вперёд" СРАЗУ закрывает книгу на заднюю обложку black-cover!
+                        if (this.currentLeafIndex >= leaves.length - 1) { 
+                            this.closeBook(); 
+                            return; 
+                        } 
+                        
+                        this.isAnimating = true; 
+                        this.playPageTurnSound();
+                        
+                        const leafIndexToTurn = this.currentLeafIndex;
+                        const leaf = leaves[leafIndexToTurn];
+                        
+                        this.updateZIndices(leafIndexToTurn, false);
+                        leaf.classList.add('is-turned');
+                        
+                        setTimeout(() => { 
+                            this.currentLeafIndex++; 
+                            this.finalizeTurn(); 
+                        }, 1500);
+
+                    } else if (direction === 'prev') {
+                        if (this.currentLeafIndex <= 0) return; 
+                        
+                        this.isAnimating = true; 
+                        this.playPageTurnSound();
+                        
+                        const leafIndexToTurnBack = this.currentLeafIndex - 1;
+                        const leaf = leaves[leafIndexToTurnBack];
+                        
+                        this.updateZIndices(leafIndexToTurnBack, true);
+                        leaf.classList.remove('is-turned');
+                        
+                        setTimeout(() => { 
+                            this.currentLeafIndex--; 
+                            this.finalizeTurn(); 
+                        }, 1500);
+                    }
+                }
+            }
+
+            finalizeTurn() {
+                this.updateZIndices();
+                this.isAnimating = false;
+                
+                const currentIndex = this.isMobileReader ? this.currentPageIndex : this.currentLeafIndex;
+                localStorage.setItem('door_universe_progress', currentIndex);
+                
+                this.loadVisiblePages(); 
+                this.updateNavArrows();
+
+                this.triggerCloudShadow();
+                this.triggerPageReveal();
+                this.playVoiceover();
+            }
+
+            toggleReadingMode() {
+                this.isReadingMode = !this.isReadingMode;
+                const layout = document.getElementById('layoutShifter');
+                const btn = document.getElementById('readingBtn');
+                
+                if (this.isReadingMode) {
+                    layout.style.transform = `scale(1.1)`;
+                    document.documentElement.style.setProperty('--bg-color', '#02040a');
+                    btn.style.color = "#fff";
+                    btn.style.background = "rgba(255,255,255,0.1)";
+                } else {
+                    layout.style.transform = `scale(1)`;
+                    document.documentElement.style.setProperty('--bg-color', '#050a15');
+                    btn.style.color = "#ffe696";
+                    btn.style.background = "rgba(10, 15, 30, 0.6)";
+                }
+                this.updateLayout();
+            }
+
+            toggleAudioMode() {
+                this.isAudioMode = !this.isAudioMode;
+                const btn = document.getElementById('audioBtn');
+                if (this.isAudioMode) {
+                    btn.innerHTML = '🔊'; btn.style.color = "#fff"; btn.style.background = "rgba(255,255,255,0.1)";
+                    this.playVoiceover();
+                } else {
+                    btn.innerHTML = '🔇'; btn.style.color = "#ffe696"; btn.style.background = "rgba(10, 15, 30, 0.6)";
+                    this.stopVoiceover();
+                }
+            }
+
+            playSingleAudio(baseName) {
+                return new Promise((resolve) => {
+                    this.voiceoverResolve = resolve;
+                    const audio = new Audio('audio/' + baseName + '.wav');
+                    this.currentVoiceover = audio;
+                    
+                    audio.onended = () => { this.currentVoiceover = null; if (this.voiceoverResolve) this.voiceoverResolve(); };
+                    audio.onerror = () => { this.currentVoiceover = null; if (this.voiceoverResolve) this.voiceoverResolve(); };
+                    
+                    audio.play().catch(e => { this.currentVoiceover = null; if (this.voiceoverResolve) this.voiceoverResolve(); });
+                });
+            }
+
+            stopVoiceover() {
+                if (this.currentVoiceover) {
+                    this.currentVoiceover.pause(); this.currentVoiceover.currentTime = 0; this.currentVoiceover = null;
+                }
+                if (this.voiceoverResolve) { this.voiceoverResolve(); this.voiceoverResolve = null; }
+            }
+
+            async playVoiceover() {
+                if (!this.isAudioMode || this.isAnimating || window.bookState !== "STATE_OPEN") return;
+                this.stopVoiceover();
+
+                if (this.isMobileReader) {
+                    const pageName = this.pages[this.currentPageIndex];
+                    if (pageName) await this.playSingleAudio(pageName);
+                } else {
+                    const idx = this.currentLeafIndex;
+                    const leftPage = idx > 0 ? this.pages[idx * 2 - 1] : null;
+                    const rightPage = idx * 2 < this.pages.length ? this.pages[idx * 2] : null;
+                    if (leftPage) await this.playSingleAudio(leftPage);
+                    if (this.isAudioMode && this.currentLeafIndex === idx && rightPage) await this.playSingleAudio(rightPage);
+                }
+            }
+
+            closeBook() {
+                if (window.bookState !== "STATE_OPEN" || this.isAnimating) return;
+                
+                if (this.cloudTimer) clearTimeout(this.cloudTimer);
+                document.querySelectorAll('.passing-cloud').forEach(el => el.classList.remove('passing-cloud'));
+                
+                this.isAnimating = true;
+                window.bookState = "closing";
+                
+                // Скрываем стрелки и тактильный слой
+                const tactile = document.getElementById('tactileWrapper');
+                if (tactile) tactile.style.display = "none";
+                
+                const btn = document.getElementById('readingBtn');
+                if (btn) btn.classList.remove('show');
+
+                const audioBtn = document.getElementById('audioBtn');
+                if (audioBtn) audioBtn.classList.remove('show');
+
+                const prevBtn = document.getElementById('navArrowPrev');
+                const nextBtn = document.getElementById('navArrowNext');
+                if (prevBtn) prevBtn.classList.remove('show');
+                if (nextBtn) nextBtn.classList.remove('show');
+                
+                this.stopVoiceover();
+                if (this.isReadingMode) this.toggleReadingMode();
+
+                // 1. МГНОВЕННО прячем внутренние страницы, чтобы back-endpaper2 не оставался виден рядом
+                const realPages = document.getElementById('realPagesContainer');
+                if (realPages) realPages.style.opacity = '0';
+
+                // 2. Сбрасываем 2-страничный разворот и центрируем книгу в один одиночный лист
+                const bookContainer = document.getElementById('bookContainer');
+                if (bookContainer) bookContainer.classList.remove('is-opened');
+                document.documentElement.style.setProperty('--shift-open-x', '0px');
+
+                const oldBackCover = document.getElementById('oldBackCover');
+                if (oldBackCover) {
+                    oldBackCover.style.opacity = '0';
+                    oldBackCover.style.pointerEvents = 'none';
+                }
+
+                if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') Tone.context.resume();
+                if (this.bgDrone) this.bgDrone.triggerRelease();
+                if (this.magicSynth) this.magicSynth.triggerAttackRelease(["C3", "G3"], "2n");
+
+                // 3. СРАЗУ показываем одиночную заднюю обложку black-cover ровно по центру
+                const backCoverFinal = document.getElementById('backCoverFinal');
+                if (backCoverFinal) {
+                    backCoverFinal.style.backgroundImage = "url('image/black-cover.webp')";
+                    backCoverFinal.classList.add('show');
+                }
+
+                setTimeout(() => {
+                    const bookCover = document.getElementById('bookCover');
+                    if (bookCover) bookCover.style.opacity = '0';
+                    
+                    window.bookState = "STATE_CLOSED_BACK";
+                    this.isAnimating = false;
+                    localStorage.setItem('door_universe_book_finished', 'true');
+
+                    // Запуск финального видео строго после показа задней обложки
+                    if (ENABLE_OUTRO && !this.outroHasPlayed) {
+                        this.outroHasPlayed = true;
+                        setTimeout(() => { 
+                            if (window.bookState === "STATE_CLOSED_BACK") {
+                                this.playOutro(); 
+                            }
+                        }, 1200); 
+                    }
+                }, 500);
+            }
+
+            flipToFront() {
+                if (window.bookState !== "STATE_CLOSED_BACK" || this.isAnimating) return;
+                this.isAnimating = true;
+                
+                this.stopVoiceover(); 
+                
+                const backCoverFinal = document.getElementById('backCoverFinal');
+                if (backCoverFinal) backCoverFinal.classList.remove('show');
+
+                if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') Tone.context.resume();
+                if (this.paperSynth) this.paperSynth.triggerAttackRelease(0.3);
+                
+                setTimeout(() => {
+                    window.bookState = "STATE_COVER";
+                    this.updateLayout();
+                    
+                    const bookCover = document.getElementById('bookCover');
+                    if (bookCover) {
+                        bookCover.style.opacity = '1';
+                        bookCover.style.transform = ''; 
+                        bookCover.style.pointerEvents = 'auto';
+                        const bBack = bookCover.querySelector('.b-back');
+                        if (bBack) bBack.style.display = ''; 
+                    }
+                    
+                    const oldBackCover = document.getElementById('oldBackCover');
+                    if (oldBackCover) {
+                        oldBackCover.style.opacity = '1';
+                        oldBackCover.style.zIndex = '';
+                        oldBackCover.classList.remove('is-closing-back');
+                    }
+                    
+                    const realPages = document.getElementById('realPagesContainer');
+                    if (realPages) realPages.style.opacity = '1';
+
+                    const container = document.getElementById('bookContainer');
+                    if (container) container.classList.remove('is-opened');
+                    
+                    const leaves = document.querySelectorAll('.leaf');
+                    leaves.forEach(leaf => leaf.classList.remove('is-turned'));
+                    
+                    const mobilePages = document.querySelectorAll('.mobile-page');
+                    mobilePages.forEach(page => page.classList.remove('is-turned', 'is-active'));
+                    if (mobilePages.length > 0) mobilePages[0].classList.add('is-active');
+
+                    document.querySelectorAll('.reveal-overlay').forEach(overlay => {
+                        delete overlay.dataset.revealed;
+                        overlay.classList.remove('is-active');
+                    });
+
+                    this.currentLeafIndex = 0;
+                    this.currentPageIndex = 0;
+                    this.updateZIndices();
+                    this.loadVisiblePages(); 
+                    this.isAnimating = false;
+                }, 800);
+            }
+
+            async playOutro() {
+                const epilogueContainer = document.getElementById('epilogueContainer');
+                const outroVideo = document.getElementById('outroVideo');
+                const skipBtn = document.getElementById('skipOutroBtn');
+                const blackOverlay = document.getElementById('blackOverlay');
+
+                if (!epilogueContainer || !outroVideo) return;
+                
+                const validOutroSrc = await this.resolveVideoSource('outro');
+                outroVideo.src = validOutroSrc || OUTRO_VIDEO;
+                this.isAnimating = true; 
+
+                blackOverlay.style.display = 'block';
+                requestAnimationFrame(() => blackOverlay.classList.remove('hidden'));
+
+                setTimeout(() => {
+                    epilogueContainer.style.display = 'flex';
+                    requestAnimationFrame(() => epilogueContainer.style.opacity = '1');
+
+                    let outroEnded = false;
+                    const endOutro = () => {
+                        if (outroEnded) return;
+                        outroEnded = true;
+
+                        outroVideo.pause();
+                        outroVideo.classList.add('fade-out');
+                        skipBtn.style.opacity = '0';
+                        skipBtn.style.pointerEvents = 'none';
+
+                        setTimeout(() => {
+                            epilogueContainer.style.display = 'none';
+                            epilogueContainer.style.opacity = '0';
+                            outroVideo.classList.remove('fade-out'); 
+                            skipBtn.style.opacity = '1';
+                            skipBtn.style.pointerEvents = 'auto';
+
+                            blackOverlay.classList.add('hidden');
+                            setTimeout(() => {
+                                blackOverlay.style.display = 'none';
+                                this.isAnimating = false; 
+                                this.playSingleAudio('final-wishes');
+                            }, 1000); 
+                        }, 1200); 
+                    };
+
+                    outroVideo.onended = endOutro;
+                    skipBtn.onclick = endOutro;
+                    outroVideo.currentTime = 0;
+
+                    let playPromise = outroVideo.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch((e) => {
+                            console.warn("Автовоспроизведение финала со звуком заблокировано браузером", e);
+                            
+                            const existingBtn = epilogueContainer.querySelector('.video-manual-play-btn');
+                            if (existingBtn) existingBtn.remove();
+
+                            const playBtn = document.createElement('button');
+                            playBtn.className = 'video-manual-play-btn';
+                            playBtn.innerHTML = "Смотреть финал ▶";
+                            
+                            playBtn.onclick = () => {
+                                playBtn.remove();
+                                outroVideo.play().catch(() => endOutro());
+                            };
+                            epilogueContainer.appendChild(playBtn);
+                        });
+                    }
+                }, 1000); 
+            }
+        }
+
+        window.onload = async () => {
+            window.engine = new BookEngine(BOOK_PAGES);
+            window.engine.updateLayout();
+
+            // 1. Лицевая обложка
+            const frontFace = document.querySelector('.b-front');
+            if (frontFace) {
+                frontFace.style.backgroundImage = "url('image/cover.webp')";
+                await window.engine.loadAndSetImage('cover', frontFace);
+            }
+            
+            // 2. Передний форзац
+            const innerFrontCover = document.querySelector('.b-inner');
+            if (innerFrontCover) window.engine.loadAndSetImage('endpaper', innerFrontCover);
+            
+            // 3. Задний форзац для обратной крышки
+            const oldBackCover = document.getElementById('oldBackCover');
+            if (oldBackCover) window.engine.loadAndSetImage('back-endpaper', oldBackCover);
+            
+            // 4. Задняя внешняя обложка: black-cover.webp
+            const backCoverFinal = document.getElementById('backCoverFinal');
+            if (backCoverFinal) {
+                backCoverFinal.style.backgroundImage = "url('image/black-cover.webp')";
+                window.engine.loadAndSetImage('black-cover', backCoverFinal);
+            }
+
+            // 5. Инициализация страниц книги
+            window.engine.initPhysicalPages();
+            window.engine.loadVisiblePages();
+
+            const prologueContainer = document.getElementById('prologueContainer');
+            const introVideo = document.getElementById('introVideo');
+            const skipIntroBtn = document.getElementById('skipIntroBtn');
+            const blackOverlay = document.getElementById('blackOverlay');
+            const touchPrompt = document.getElementById('touchPrompt');
+            const startScreen = document.getElementById('startScreen');
+            const startBtn = document.getElementById('startBtn');
+
+            startBtn.onclick = async () => {
+                window.engine.currentLeafIndex = 0;
+                window.engine.currentPageIndex = 0;
+                window.engine.outroHasPlayed = false;
+
+                try { 
+                    if (typeof Tone !== 'undefined') {
+                        await Tone.start(); 
+                        if (Tone.context.state !== 'running') await Tone.context.resume();
+                    }
+                } catch(e) { console.warn("Tone.js start notice:", e); }
+                
+                window.engine.initAudio();
+
+                startScreen.style.opacity = '0';
+                setTimeout(() => { startScreen.style.display = 'none'; }, 800);
+
+                let prologueEnded = false;
+                const endPrologue = () => {
+                    if (prologueEnded) return;
+                    prologueEnded = true;
+
+                    introVideo.pause();
+                    const layoutShifter = document.getElementById('layoutShifter');
+                    const moonlightGlow = document.getElementById('moonlightGlow');
+
+                    introVideo.classList.add('fade-out');
+                    skipIntroBtn.style.opacity = '0';
+                    skipIntroBtn.style.pointerEvents = 'none';
+                    
+                    layoutShifter.style.transition = 'none';
+                    layoutShifter.style.opacity = '0';
+                    layoutShifter.style.transform = 'scale(0.95)';
+                    
+                    setTimeout(() => {
+                        prologueContainer.style.display = 'none';
+                        
+                        setTimeout(() => {
+                            moonlightGlow.classList.add('cinematic-glow');
+                            
+                            requestAnimationFrame(() => {
+                                layoutShifter.style.transition = 'opacity 1s ease-out, transform 1s ease-out';
+                                layoutShifter.style.opacity = '1';
+                                layoutShifter.style.transform = 'scale(0.98)';
+                                blackOverlay.classList.add('hidden');
+                            });
+                            
+                            setTimeout(() => {
+                                blackOverlay.style.display = 'none';
+                                
+                                layoutShifter.style.transition = 'transform 0.8s ease-out';
+                                layoutShifter.style.transform = 'scale(1)';
+                                moonlightGlow.classList.remove('cinematic-glow');
+                                
+                                setTimeout(() => {
+                                    window.engine.isAnimating = false; 
+                                    
+                                    layoutShifter.style.transition = 'transform 1.5s cubic-bezier(0.645, 0.045, 0.355, 1)';
+                                    layoutShifter.style.opacity = '';
+                                    layoutShifter.style.transform = '';
+
+                                    setTimeout(() => {
+                                        if (window.bookState === "STATE_COVER") {
+                                            if (touchPrompt) {
+                                                touchPrompt.classList.add('show');
+                                                window.promptTimeout = setTimeout(() => {
+                                                    touchPrompt.classList.remove('show');
+                                                }, 7000);
+                                            }
+                                            
+                                            const coverBeam = document.getElementById('coverBeam');
+                                            if (coverBeam) coverBeam.classList.add('play-beam');
+                                        }
+                                    }, 400);
+
+                                }, 800);
+                            }, 1000);
+                        }, 500); 
+                    }, 1200); 
+                };
+
+                if (ENABLE_INTRO) {
+                    const validIntroSrc = await window.engine.resolveVideoSource('intro');
+                    if (validIntroSrc) {
+                        prologueContainer.style.display = 'flex';
+                        introVideo.src = validIntroSrc;
+                        introVideo.muted = false; 
+                        
+                        introVideo.addEventListener('ended', endPrologue);
+                        skipIntroBtn.addEventListener('click', endPrologue);
+                        introVideo.addEventListener('error', endPrologue);
+
+                        let playPromise = introVideo.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch((e) => {
+                                console.warn("Автозапуск интро со звуком заблокирован политикой браузера", e);
+                                const playBtn = document.createElement('button');
+                                playBtn.className = 'video-manual-play-btn';
+                                playBtn.innerHTML = "Включить видео ▶";
+                                playBtn.onclick = () => {
+                                    playBtn.remove();
+                                    introVideo.play().catch(() => endPrologue());
+                                };
+                                prologueContainer.appendChild(playBtn);
+                            });
+                        }
+                        window.engine.isAnimating = true; 
+                    } else {
+                        endPrologue();
+                    }
+                } else {
+                    endPrologue();
+                }
+            };
+        };
+
+        // Поддержка клавиатуры (стрелки влево / вправо)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') window.engine.turnPage('next');
+            if (e.key === 'ArrowLeft') window.engine.turnPage('prev');
+        });
+        
+        // Поддержка свайпов для телефонов и планшетов
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches && e.touches.length === 1) {
+                window.engine.touchStartX = e.touches[0].clientX;
+                window.engine.touchStartY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (e.changedTouches && e.changedTouches.length === 1) {
+                const diffX = e.changedTouches[0].clientX - window.engine.touchStartX;
+                const diffY = e.changedTouches[0].clientY - window.engine.touchStartY;
+                
+                if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY)) {
+                    if (diffX < 0) {
+                        window.engine.turnPage('next');
+                    } else {
+                        window.engine.turnPage('prev');
+                    }
+                }
+            }
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+            if (window.engine) {
+                const wasMobile = window.engine.isMobileReader;
+                window.engine.updateLayout();
+                if (wasMobile !== window.engine.isMobileReader) {
+                    window.engine.initPhysicalPages();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
